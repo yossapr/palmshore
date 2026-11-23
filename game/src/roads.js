@@ -26,9 +26,9 @@ export function nodePoint(vi, hi) {
   return { x: VX[vi], y: HY[hi] };
 }
 
-/** The walkable loop a pedestrian follows round a block, inset from the asphalt. */
+/** The walkable loop a pedestrian follows round a block, down the middle of its pavement band. */
 export function sidewalkLoop(block) {
-  const inset = BLOCK_INSET + 13;
+  const inset = BLOCK_INSET - 13;
   return {
     x0: block.x0 + inset,
     y0: block.y0 + inset,

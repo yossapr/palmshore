@@ -20,10 +20,10 @@ const DEBUG = 'http://127.0.0.1:9223';
 const MAX_BYTES = 256 * 1024;
 
 const SCENES = [
-  { shot: 'chase', file: '1-ocean-drive-pursuit' },
-  { shot: 'boulevard', file: '2-verano-boulevard' },
-  { shot: 'shootout', file: '3-wanted-level-four' },
-  { shot: 'crane', file: '4-dock-heist' },
+  { shot: 'chase', file: '1-verano-heights-standoff' },
+  { shot: 'boulevard', file: '2-ocean-drive-cruise' },
+  { shot: 'shootout', file: '3-sunray-clinic-shootout' },
+  { shot: 'crane', file: '4-gannet-docks-heist' },
 ];
 
 const wanted = process.argv.slice(2);

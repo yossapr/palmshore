@@ -521,8 +521,8 @@ function drawTitle(ctx, game, width, height) {
   gradient.addColorStop(1, 'rgba(20,16,12,0.78)');
   ctx.fillStyle = gradient;
   ctx.fillRect(0, 0, width, height);
-  // Sun.
-  const sunX = width * 0.82;
+  // Sun to the north-west, matching the shadows thrown across the city.
+  const sunX = width * 0.16;
   const sunY = -70;
   const sun = ctx.createRadialGradient(sunX, sunY, 8, sunX, sunY, 300);
   sun.addColorStop(0, 'rgba(255,238,184,0.5)');
