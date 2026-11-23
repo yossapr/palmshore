@@ -122,113 +122,166 @@ export function createHud(canvas) {
     ctx.font = `600 ${9.5 * s}px ${FONT.narrow}`;
     ctx.fillText(`${street.street} / ${street.cross}`, 22 * s, my + radius + 40 * s);
 
-    // ---- money, wanted stars, health (top right) ----------------------------
-    const right = w - 22 * s;
-    ctx.fillStyle = 'rgba(24,20,17,0.36)';
-    roundRectPath(ctx, w - 296 * s, 6 * s, 286 * s, 126 * s, 12 * s);
-    ctx.fill();
-    ctx.textAlign = 'right';
-    ctx.font = `700 ${30 * s}px ${FONT.display}`;
-    ctx.lineWidth = 4 * s;
-    ctx.strokeStyle = 'rgba(28,23,19,0.72)';
-    const cash = money(p.money);
-    ctx.strokeText(cash, right, 44 * s);
-    ctx.fillStyle = cashFlash > 0 ? '#fff1c2' : PALETTE.cream;
-    ctx.fillText(cash, right, 44 * s);
+    // ---- status column (top right) -----------------------------------------
+    // One right-aligned column: the wanted stars, then the cash, then health and
+    // armour, then the weapon and its ammo. Every row is measured before anything
+    // is drawn, so the panel and the bars widen with the text instead of guessing.
+    const edge = Math.max(14, 14 * s);
+    const padX = 12 * s;
+    const padY = 10 * s;
+    const rowGap = 7 * s;
+    const tightGap = 4 * s;
+    const wantedFont = `700 ${8.5 * s}px ${FONT.narrow}`;
+    const statFont = `700 ${10 * s}px ${FONT.narrow}`;
+    const cashFont = `700 ${27 * s}px ${FONT.display}`;
+    const nameFont = `700 ${10.5 * s}px ${FONT.narrow}`;
+    const ammoFont = `700 ${21 * s}px ${FONT.display}`;
+    const starR = 8 * s;
+    const starGap = 5 * s;
+    const barH = Math.max(6 * s, 5);
 
-    const starsX = right - 5 * 14 * s;
-    const starsY = 60 * s;
-    ctx.fillStyle = 'rgba(28,24,20,0.4)';
-    roundRectPath(ctx, starsX + 4 * s, starsY - 10 * s, 5 * 14 * s, 20 * s, 9 * s);
+    const measure = (px, font, text) => {
+      ctx.font = font;
+      const m = ctx.measureText(text);
+      const asc = m.actualBoundingBoxAscent || px * 0.74;
+      const desc = m.actualBoundingBoxDescent || px * 0.2;
+      return { w: m.width, asc, desc, h: asc + desc };
+    };
+
+    const cash = money(p.money);
+    const weapon = WEAPONS[p.weapon];
+    const ammo = p.weapon === 'fists' ? '—' : String(p.weapons[p.weapon].ammo).padStart(2, '0');
+    const wantedLabel = WANTED.starsLabel[police.level] ?? 'CLEAR';
+    const healthLabel = `HEALTH ${Math.ceil(p.health)}`;
+    const armourLabel = `ARMOUR ${Math.ceil(p.armour)}`;
+    const cashM = measure(27 * s, cashFont, cash);
+    const nameM = measure(10.5 * s, nameFont, weapon.name);
+    const ammoM = measure(21 * s, ammoFont, ammo);
+    const wantedM = measure(8.5 * s, wantedFont, wantedLabel);
+    const healthM = measure(10 * s, statFont, healthLabel);
+    const armourM = measure(10 * s, statFont, armourLabel);
+    const starRowW = WANTED.max * starR * 2 + (WANTED.max - 1) * starGap;
+    const weaponRowW = nameM.w + ammoM.w + 9 * s;
+    const contentW = Math.max(starRowW, wantedM.w, cashM.w, weaponRowW, healthM.w, armourM.w, 148 * s);
+    const panelX = w - edge - contentW - padX * 2;
+    const right = w - edge - padX;
+    const left = right - contentW;
+
+    let cursor = edge + padY;
+    const wantedBaseline = cursor + wantedM.asc;
+    cursor += wantedM.h + 3 * s;
+    const starY = cursor + starR;
+    cursor += starR * 2 + rowGap;
+    const cashBaseline = cursor + cashM.asc;
+    cursor += cashM.h + rowGap;
+    const healthBaseline = cursor + healthM.asc;
+    const healthTop = cursor + healthM.h + 2 * s;
+    cursor = healthTop + barH + tightGap;
+    const armourBaseline = cursor + armourM.asc;
+    const armourTop = cursor + armourM.h + 2 * s;
+    cursor = armourTop + barH + rowGap;
+    const weaponTop = cursor;
+    const weaponBaseline = weaponTop + Math.max(ammoM.asc, nameM.asc);
+    const panelH = weaponTop + Math.max(ammoM.h, nameM.h) + padY - edge;
+
+    ctx.fillStyle = 'rgba(29,24,20,0.94)';
+    roundRectPath(ctx, panelX, edge, contentW + padX * 2, panelH, 9 * s);
     ctx.fill();
+    ctx.strokeStyle = 'rgba(240,201,106,0.4)';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+
+    // Wanted stars, five to a row, the empty ones dimmed, with the state above them.
+    ctx.textAlign = 'right';
+    ctx.font = wantedFont;
+    ctx.fillStyle = police.level > 0 ? TONE.coral : 'rgba(247,237,215,0.5)';
+    ctx.fillText(wantedLabel, right, wantedBaseline);
+    const starsX = right - starRowW;
     for (let i = 0; i < WANTED.max; i += 1) {
       const active = i < police.level;
-      const cx = starsX + 15 * s + i * 14 * s;
+      const cx = starsX + starR + i * (starR * 2 + starGap);
       const blink = active && police.level >= 4 ? 0.6 + 0.4 * Math.sin(time * 8 + i) : 1;
-      starPath(ctx, cx, starsY, 8.2 * s);
-      ctx.fillStyle = active ? `rgba(240,196,92,${blink})` : 'rgba(36,31,26,0.72)';
+      starPath(ctx, cx, starY, starR);
+      ctx.fillStyle = active ? `rgba(240,196,92,${blink})` : 'rgba(247,237,215,0.12)';
       ctx.fill();
-      ctx.strokeStyle = active ? 'rgba(50,38,20,0.7)' : 'rgba(247,237,215,0.4)';
-      ctx.lineWidth = 1 * s;
+      ctx.strokeStyle = active ? 'rgba(50,38,20,0.7)' : 'rgba(247,237,215,0.3)';
+      ctx.lineWidth = 1;
       ctx.stroke();
     }
-    ctx.font = `700 ${10.5 * s}px ${FONT.narrow}`;
-    ctx.fillStyle = police.level > 0 ? TONE.coral : 'rgba(247,237,215,0.72)';
-    ctx.fillText(WANTED.starsLabel[police.level] ?? 'CLEAR', right, starsY + 17 * s);
 
-    // Health and armour bars.
-    const barW = 186 * s;
-    const barX = right - barW;
-    const bar = (value, max, color, back, label, y) => {
-      ctx.fillStyle = 'rgba(28,24,20,0.5)';
-      roundRectPath(ctx, barX - 2 * s, y - 2 * s, barW + 4 * s, 11 * s, 4 * s);
+    // Cash on its own line.
+    ctx.textAlign = 'right';
+    ctx.font = cashFont;
+    ctx.lineWidth = 3.5 * s;
+    ctx.strokeStyle = 'rgba(28,23,19,0.7)';
+    ctx.strokeText(cash, right, cashBaseline);
+    ctx.fillStyle = cashFlash > 0 ? '#fff1c2' : PALETTE.cream;
+    ctx.fillText(cash, right, cashBaseline);
+
+    // Health and armour: the label sits directly above its bar, never over it.
+    const stat = (label, labelBaseline, barTop, value, max, color) => {
+      ctx.textAlign = 'left';
+      ctx.font = statFont;
+      ctx.fillStyle = 'rgba(247,237,215,0.86)';
+      ctx.fillText(label, left, labelBaseline);
+      ctx.fillStyle = 'rgba(20,18,15,0.62)';
+      roundRectPath(ctx, left, barTop, contentW, barH, barH / 2);
       ctx.fill();
-      ctx.fillStyle = back;
-      roundRectPath(ctx, barX, y, barW, 7 * s, 3 * s);
-      ctx.fill();
-      const wdt = clamp(value / max, 0, 1) * barW;
-      if (wdt > 0) {
+      const filled = clamp(value / max, 0, 1) * contentW;
+      if (filled > 0) {
         ctx.fillStyle = color;
-        roundRectPath(ctx, barX, y, wdt, 7 * s, 3 * s);
+        roundRectPath(ctx, left, barTop, filled, barH, barH / 2);
         ctx.fill();
       }
-      ctx.font = `700 ${9.5 * s}px ${FONT.narrow}`;
-      ctx.fillStyle = 'rgba(247,237,215,0.95)';
-      ctx.textAlign = 'left';
-      ctx.fillText(`${label} ${Math.ceil(value)}`, barX, y - 4 * s);
     };
-    bar(p.health, p.maxHealth, p.health > 45 ? '#7fb98a' : '#d56a55', 'rgba(20,30,22,0.5)', 'HEALTH', 88 * s);
-    bar(p.armour, 100, '#7fa8c4', 'rgba(22,30,40,0.5)', 'ARMOUR', 111 * s);
-    ctx.textAlign = 'right';
+    stat(healthLabel, healthBaseline, healthTop, p.health, p.maxHealth, p.health > 45 ? '#7fb98a' : '#d56a55');
+    stat(armourLabel, armourBaseline, armourTop, p.armour, 100, '#7fa8c4');
 
-    // ---- weapon panel (bottom right) ---------------------------------------
-    const weapon = WEAPONS[p.weapon];
-    const wx = w - 22 * s;
-    const wy = h - 22 * s;
+    // Weapon and ammo share the last line.
     ctx.textAlign = 'right';
-    ctx.font = `700 ${11 * s}px ${FONT.narrow}`;
-    ctx.fillStyle = PALETTE.cream;
-    const ammo = p.weapon === 'fists' ? '—' : String(p.weapons[p.weapon].ammo).padStart(2, '0');
-    ctx.font = `700 ${27 * s}px ${FONT.display}`;
+    ctx.font = ammoFont;
     ctx.lineWidth = 3 * s;
     ctx.strokeStyle = 'rgba(28,23,19,0.7)';
-    ctx.strokeText(ammo, wx, wy);
-    ctx.fillText(ammo, wx, wy);
-    ctx.font = `700 ${11 * s}px ${FONT.narrow}`;
+    ctx.strokeText(ammo, right, weaponBaseline);
+    ctx.fillStyle = PALETTE.cream;
+    ctx.fillText(ammo, right, weaponBaseline);
+    ctx.font = nameFont;
     ctx.fillStyle = TONE.coral;
-    ctx.fillText(weapon.name, wx, wy - 34 * s);
-    ctx.fillStyle = 'rgba(247,237,215,0.55)';
-    ctx.font = `600 ${8 * s}px ${FONT.narrow}`;
-    ctx.fillText('1 · 2 · 3 · 4  SWITCH', wx, wy - 20 * s);
+    ctx.fillText(weapon.name, right - ammoM.w - 9 * s, weaponBaseline);
 
-    // Speedometer while driving.
+    // ---- speedometer (bottom right, fully inside the frame) -----------------
     if (p.mode === 'car' && p.car) {
       const speed = Math.hypot(p.car.vx, p.car.vy);
       const mph = Math.round(speed * 0.42);
-      const gx = wx - 88 * s;
-      const gy = wy - 60 * s;
-      const r = 31 * s;
+      const r = 32 * s;
+      const ring = 6 * s;
+      const gx = w - edge - (r + ring / 2 + 4 * s);
+      const gy = h - edge - (r + ring / 2 + 4 * s);
+      ctx.beginPath();
+      ctx.arc(gx, gy, r + ring / 2 + 4 * s, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(24,20,17,0.58)';
+      ctx.fill();
       ctx.beginPath();
       ctx.arc(gx, gy, r, Math.PI * 0.78, Math.PI * 2.22);
-      ctx.strokeStyle = 'rgba(28,23,19,0.5)';
-      ctx.lineWidth = 7 * s;
+      ctx.strokeStyle = 'rgba(28,23,19,0.55)';
+      ctx.lineWidth = ring;
       ctx.stroke();
       ctx.beginPath();
       ctx.arc(gx, gy, r, Math.PI * 0.78, Math.PI * (0.78 + 1.44 * clamp(speed / 340, 0, 1)));
       ctx.strokeStyle = p.car.health < 90 ? PALETTE.coral : PALETTE.tealLight;
-      ctx.lineWidth = 4 * s;
+      ctx.lineWidth = ring * 0.62;
       ctx.stroke();
       ctx.fillStyle = PALETTE.cream;
       ctx.textAlign = 'center';
-      ctx.font = `700 ${18 * s}px ${FONT.display}`;
+      ctx.font = `700 ${20 * s}px ${FONT.display}`;
       ctx.fillText(String(mph), gx, gy + 4 * s);
-      ctx.font = `600 ${7.5 * s}px ${FONT.narrow}`;
-      ctx.fillStyle = 'rgba(247,237,215,0.6)';
-      ctx.fillText('MPH', gx, gy + 15 * s);
+      ctx.font = `600 ${8.5 * s}px ${FONT.narrow}`;
+      ctx.fillStyle = 'rgba(247,237,215,0.66)';
+      ctx.fillText('MPH', gx, gy + 18 * s);
       if (p.car.burning) {
         ctx.fillStyle = TONE.coral;
         ctx.font = `700 ${9 * s}px ${FONT.narrow}`;
-        ctx.fillText('ENGINE FIRE', gx, gy - 18 * s);
+        ctx.fillText('ENGINE FIRE', gx, gy - 20 * s);
       }
     }
     ctx.textAlign = 'left';
@@ -336,12 +389,12 @@ export function createHud(canvas) {
       ctx.textAlign = 'left';
     }
 
-    // ---- dialogue (bottom centre) ------------------------------------------
+    // ---- dialogue (top centre, under the mission banner) --------------------
     const dialogue = game.missions?.currentDialogue;
     if (dialogue) {
-      const dw = Math.min(640 * s, w - 340 * s);
+      const dw = Math.min(600 * s, w - 400 * s);
       const dx = (w - dw) / 2;
-      const dy = h - 102 * s;
+      const dy = mission ? 12 * s + 58 * s + 14 * s : 14 * s;
       const age = dialogue.age ?? 0;
       const alphaD = clamp(age / 0.18, 0, 1);
       ctx.globalAlpha = alphaD;
