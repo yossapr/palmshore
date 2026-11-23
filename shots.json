@@ -1,5 +1,30 @@
 [
-  { "name": "1-start.jpg", "query": "?shot=start&seed=1" },
-  { "name": "2-play.jpg", "query": "?shot=play&seed=1" },
-  { "name": "3-end.jpg", "query": "?shot=end&seed=1" }
+  {
+    "name": "1-ocean-drive-pursuit.jpg",
+    "query": "?shot=chase&seed=1",
+    "scene": "chase",
+    "title": "Ocean Drive pursuit",
+    "note": "Five cruisers, a roadblock, traffic and fleeing beachgoers behind a three-star wanted level."
+  },
+  {
+    "name": "2-verano-boulevard.jpg",
+    "query": "?shot=boulevard&seed=1",
+    "scene": "boulevard",
+    "title": "Verano Boulevard",
+    "note": "A courier run heading north through downtown, with live traffic, sidewalks and shopfronts."
+  },
+  {
+    "name": "3-wanted-level-four.jpg",
+    "query": "?shot=shootout&seed=1",
+    "scene": "shootout",
+    "title": "Wanted level four",
+    "note": "A firefight outside the Sunray Clinic with officers, a burning cruiser and the air unit overhead."
+  },
+  {
+    "name": "4-dock-heist.jpg",
+    "query": "?shot=crane&seed=1",
+    "scene": "crane",
+    "title": "Crane Game",
+    "note": "Dee and the Gulls at Gannet Docks during the flatbed job, with Dorsey on the radio."
+  }
 ]
