@@ -1,1 +1,5 @@
-[{"name":"1-verano-heights-standoff.jpg","query":"?shot=chase&seed=1","scene":"chase","title":"Verano Heights standoff","note":"Three stars and two cruisers closing in on a drift down Verano Boulevard, with traffic, a crowd on the pavement and the full HUD."},{"name":"2-ocean-drive-cruise.jpg","query":"?shot=boulevard&seed=1","scene":"boulevard","title":"Ocean Drive cruise","note":"A sunny run south past the Coral Avenue crossing: traffic both ways, strollers on the pavement, umbrellas and palms on the sand."},{"name":"3-sunray-clinic-shootout.jpg","query":"?shot=shootout&seed=1","scene":"shootout","title":"Sunray Clinic shootout","note":"A four-star firefight outside the Sunray Clinic: a burning cruiser, officers in cover, tracers, smoke and the air unit overhead."},{"name":"4-gannet-docks-heist.jpg","query":"?shot=crane&seed=1","scene":"crane","title":"Crane Game","note":"Dee and the Gulls on the Gannet Docks apron with the flatbed, freight shed, containers and crane."}]
+[
+  { "name": "1-start.jpg", "query": "?shot=start&seed=1" },
+  { "name": "2-play.jpg", "query": "?shot=play&seed=1" },
+  { "name": "3-end.jpg", "query": "?shot=end&seed=1" }
+]
