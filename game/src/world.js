@@ -240,6 +240,13 @@ export class World {
     sea.name = 'sea';
     this.group.add(sea);
     this.sea = sea;
+    const crestMat = new THREE.MeshBasicMaterial({ color: '#d8efe6', transparent: true, opacity: 0.34 });
+    for (let i = 0; i < 34; i += 1) {
+      const crest = new THREE.Mesh(new THREE.PlaneGeometry(this.rng.range(2.5, 10), 0.24), crestMat);
+      crest.rotation.x = -Math.PI / 2;
+      crest.position.set(this.rng.range(CITY.waterX + 2, CITY.waterX + 210), 0.03, this.rng.range(-20, 360));
+      this.group.add(crest);
+    }
 
     // Warm glints on the water so the horizon reads as sea, not a blue wall.
     const glintMat = new THREE.MeshBasicMaterial({ color: '#bfe6df', transparent: true, opacity: 0.22 });
@@ -306,8 +313,8 @@ export class World {
       const gap = 2.4;
       const halfW = (inner.w - gap) / 2;
       const halfD = (inner.d - gap) / 2;
-      for (let i = 0; i < 2; i += 1) {
-        for (let j = 0; j < 2; j += 1) {
+      for (let i = 1; i >= 0; i -= 1) {
+        for (let j = 1; j >= 0; j -= 1) {
           plots.push({
             x: inner.x + i * (halfW + gap) + this.rng.range(0.4, 1.2),
             z: inner.z + j * (halfD + gap) + this.rng.range(0.4, 1.2),
@@ -432,6 +439,7 @@ export class World {
 
   frontSide(info, plot) {
     const rect = info.rect;
+    if (info.col >= 5) return 'e';
     const distances = [
       { side: 'w', d: plot.x - rect.x },
       { side: 'e', d: rect.x + rect.w - (plot.x + plot.w) },
@@ -529,13 +537,13 @@ export class World {
     const bx = t.x + along.x * cornerOffset;
     const bz = t.z + along.z * cornerOffset;
     const blade = new THREE.Group();
-    blade.position.set(bx, base + 4.55, bz);
+    blade.position.set(bx, base + 5.1, bz);
     blade.rotation.y = t.rot + Math.PI / 2;
     const bladeMat = new THREE.MeshBasicMaterial({ map: tex, side: THREE.FrontSide });
-    const bladePlane = new THREE.Mesh(new THREE.PlaneGeometry(3.1, 0.98), bladeMat);
+    const bladePlane = new THREE.Mesh(new THREE.PlaneGeometry(4.6, 1.25), bladeMat);
     bladePlane.position.z = 0.012;
     blade.add(bladePlane);
-    const bladeBack = new THREE.Mesh(new THREE.PlaneGeometry(3.1, 0.98), bladeMat);
+    const bladeBack = new THREE.Mesh(new THREE.PlaneGeometry(4.6, 1.25), bladeMat);
     bladeBack.rotation.y = Math.PI;
     bladeBack.position.z = -0.012;
     blade.add(bladeBack);
@@ -565,6 +573,18 @@ export class World {
         );
         rooftop.add(pole);
       }
+      // A second billboard across the roofline, facing down the avenue.
+      const cross = new THREE.Mesh(
+        new THREE.PlaneGeometry(billW * 0.86, billW * 0.2),
+        new THREE.MeshBasicMaterial({ map: tex, side: THREE.DoubleSide }),
+      );
+      cross.position.set(
+        t.x + outward.x * 0.9 + Math.cos(t.rot) * billW * 0.32,
+        base + Math.max(height + 2.7, 7.5),
+        t.z + outward.z * 0.9 + Math.sin(t.rot) * billW * 0.32,
+      );
+      cross.rotation.y = t.rot + Math.PI / 2;
+      rooftop.add(cross);
       this.group.add(rooftop);
       const vtex = verticalSignTexture(sign.name, sign.color);
       const vmat = new THREE.MeshBasicMaterial({ map: vtex, side: THREE.FrontSide });

@@ -56,7 +56,7 @@ export const WORLD = {
   pitch: 62,
   roadHalf: 7.6,
   walk: 3.5,
-  beach: 48,
+  beach: 32,
   water: 650,
   curbHeight: 0.18,
   fogNear: 52,
@@ -323,7 +323,7 @@ export const FONTS = {
 export const SHOT_SAVE = {
   version: 1,
   money: 18450,
-  rp: 620,
+  rp: 760,
   missionIndex: 2,
   missionStage: 2,
   completed: [0, 1],

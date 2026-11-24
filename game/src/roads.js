@@ -203,7 +203,6 @@ export class Roads {
       group.add(mesh);
     }
     this.buildSignals(group);
-    this.buildStreetSigns(group);
     scene.add(group);
     this.group = group;
   }
