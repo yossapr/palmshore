@@ -1,134 +1,115 @@
-// Boot and the one loop: input is read every frame, the world advances in fixed 1/60 s steps
-// (several in a slow frame, none in a fast one), and the renderer paints what is there. The game
-// moves between four screens: title, play, paused and game over.
-//
-// ?seed=N fixes the falling pattern. ?shot=start|play|end (with &seed=N) stages that scene
-// instead of running the loop, paints it twice and sets window.__shotReady for a screenshot.
-import { BEST_KEY, LIVES, STEP } from './config.js';
-import { createRandom } from './random.js';
-import { createWorld, EVENT_HIT, EVENT_OVER } from './world.js';
-import { ACTION_CONFIRM, ACTION_PAUSE, createInput } from './input.js';
-import { createRenderer, SCREEN_OVER, SCREEN_PAUSED, SCREEN_PLAY, SCREEN_TITLE } from './render.js';
-import { stageShot } from './shots.js';
+// Skeleton boot: build the stage, the city, a walkable stand-in, and prove the sun works.
 
-/** The longest frame the loop catches up on; a longer stall (a hidden tab) is dropped, not replayed. */
-const MAX_FRAME = 0.25;
+import { WORLD, CITY, CLOCK } from './config.js';
+import { Renderer } from './render.js';
+import { Roads } from './roads.js';
+import { World } from './world.js';
+import { ChaseCamera } from './camera.js';
+import { Input } from './input.js';
+import { clamp, wrapAngle } from './math.js';
 
-const params = new URLSearchParams(window.location.search);
-const shot = params.get('shot');
-const seedParam = Number.parseInt(params.get('seed') ?? '', 10);
-const seed = Number.isInteger(seedParam) ? seedParam : Math.floor(Math.random() * 4294967296);
+const worldCanvas = document.getElementById('world');
+const hudCanvas = document.getElementById('hud');
+const hud = hudCanvas.getContext('2d');
+const renderer = new Renderer(worldCanvas);
+const roads = new Roads(WORLD.seed);
+roads.buildMeshes(renderer.scene);
+const world = new World(renderer.scene, roads);
+const chase = new ChaseCamera(renderer.camera);
+const input = new Input(hudCanvas);
 
-const canvas = document.getElementById('game');
-const status = document.getElementById('status');
-const world = createWorld(createRandom(seed));
-const renderer = createRenderer(canvas);
+const params = new URLSearchParams(location.search);
+const player = {
+  x: Number(params.get('x') ?? 361.4),
+  z: Number(params.get('z') ?? 152),
+  y: 0.2,
+  heading: Number(params.get('yaw') ?? -Math.PI / 2),
+  speed: 0, walkPhase: 0,
+};
+const stand = new THREE.Group();
+const body = new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.9, 0.34), new THREE.MeshLambertMaterial({ color: '#d96f5f' }));
+body.position.y = 1.0;
+body.castShadow = true;
+stand.add(body);
+const head = new THREE.Mesh(new THREE.SphereGeometry(0.2, 8, 6), new THREE.MeshLambertMaterial({ color: '#c78e63' }));
+head.position.y = 1.65;
+head.castShadow = true;
+stand.add(head);
+renderer.scene.add(stand);
+chase.reset(player, player.heading);
 
-function readBest() {
-  try {
-    return Number.parseInt(window.localStorage.getItem(BEST_KEY) ?? '0', 10) || 0;
-  } catch {
-    return 0;
-  }
+let width = 1280;
+let height = 720;
+function resize() {
+  width = window.innerWidth;
+  height = window.innerHeight;
+  renderer.resize(width, height);
+  hudCanvas.width = Math.round(width * Math.min(window.devicePixelRatio || 1, 2));
+  hudCanvas.height = Math.round(height * Math.min(window.devicePixelRatio || 1, 2));
+  hudCanvas.style.width = `${width}px`;
+  hudCanvas.style.height = `${height}px`;
+  hud.setTransform(Math.min(window.devicePixelRatio || 1, 2), 0, 0, Math.min(window.devicePixelRatio || 1, 2), 0, 0);
 }
+resize();
+window.addEventListener('resize', resize);
+document.getElementById('boot')?.classList.add('hidden');
 
-function saveBest(value) {
-  try {
-    window.localStorage.setItem(BEST_KEY, String(value));
-  } catch {
-    // Storage can be off (private windows): the best score then lasts this visit only.
+const clock = new THREE.Clock();
+let gameTime = 0;
+
+function frame() {
+  const dt = Math.min(clock.getDelta(), 0.05);
+  gameTime += dt;
+  const { dx, dy } = input.consumeMouseDelta();
+  if (dx || dy) chase.orbit(dx, dy);
+  const axis = input.axis();
+  const forward = { x: Math.cos(chase.yaw), z: Math.sin(chase.yaw) };
+  const right = { x: -forward.z, z: forward.x };
+  let mx = forward.x * -axis.y + right.x * axis.x;
+  let mz = forward.z * -axis.y + right.z * axis.x;
+  const len = Math.hypot(mx, mz);
+  const moving = len > 0.01;
+  if (moving) {
+    mx /= len;
+    mz /= len;
+    player.heading = Math.atan2(mz, mx);
+    const speed = 4.6;
+    player.x += mx * speed * dt;
+    player.z += mz * speed * dt;
+    player.walkPhase += dt * 9;
   }
-}
+  world.resolveCircle(player, 0.42);
+  player.x = clamp(player.x, 1, CITY.waterX - 1.2);
+  player.z = clamp(player.z, 1, WORLD.rows * WORLD.pitch + 40);
+  player.y = world.heightAt(player.x, player.z);
+  stand.position.set(player.x, player.y, player.z);
+  stand.rotation.y = -player.heading + Math.PI / 2;
 
-function runShot(name) {
-  const scene = stageShot(name, world);
-  let painted = 0;
-  function paint() {
-    renderer.draw(world.state, scene.screen, scene.best);
-    painted += 1;
-    if (painted < 2) requestAnimationFrame(paint);
-    else window.__shotReady = true;
-  }
-  requestAnimationFrame(paint);
-}
-
-function runGame() {
-  const input = createInput(canvas);
-  let screen = SCREEN_TITLE;
-  let best = readBest();
-  let accumulator = 0;
-  let last = performance.now();
-
-  // Screen readers (and anyone watching the page's text) hear the screen changes and each hit.
-  function announce(message) {
-    status.textContent = message;
-  }
-
-  function startGame() {
-    world.reset();
-    accumulator = 0;
-    screen = SCREEN_PLAY;
-    announce(`Playing. ${LIVES} lives.`);
-  }
-
-  function endGame() {
-    screen = SCREEN_OVER;
-    if (world.state.score > best) {
-      best = world.state.score;
-      saveBest(best);
-    }
-    announce(`Game over. Score ${world.state.score}. Best ${best}.`);
-  }
-
-  function handleActions() {
-    const actions = input.takeActions();
-    if (actions & ACTION_CONFIRM && (screen === SCREEN_TITLE || screen === SCREEN_OVER)) startGame();
-    else if (actions & ACTION_PAUSE && screen === SCREEN_PLAY) {
-      screen = SCREEN_PAUSED;
-      announce('Paused.');
-    } else if (actions & (ACTION_PAUSE | ACTION_CONFIRM) && screen === SCREEN_PAUSED) {
-      screen = SCREEN_PLAY;
-      announce('Playing.');
-    }
-  }
-
-  function step() {
-    if (screen === SCREEN_TITLE) {
-      world.step(STEP, 0, true);
-      return;
-    }
-    const events = world.step(STEP, input.direction(), false);
-    if (events & EVENT_OVER) endGame();
-    else if (events & EVENT_HIT) announce(world.state.lives === 1 ? 'Hit. 1 life left.' : `Hit. ${world.state.lives} lives left.`);
-  }
-
-  function frame(now) {
-    requestAnimationFrame(frame);
-    accumulator += Math.min((now - last) / 1000, MAX_FRAME);
-    last = now;
-    handleActions();
-    if (screen === SCREEN_TITLE || screen === SCREEN_PLAY) {
-      while (accumulator >= STEP && (screen === SCREEN_TITLE || screen === SCREEN_PLAY)) {
-        step();
-        accumulator -= STEP;
-      }
-    } else {
-      accumulator = 0;
-    }
-    renderer.draw(world.state, screen, best);
-  }
-
-  // Leaving the tab pauses a running game rather than letting blocks fall unseen.
-  document.addEventListener('visibilitychange', () => {
-    if (document.hidden && screen === SCREEN_PLAY) {
-      screen = SCREEN_PAUSED;
-      announce('Paused.');
-    }
+  chase.update({ x: player.x, y: player.y + 0.9, z: player.z, heading: player.heading }, dt, {
+    mode: 'foot', moving, moveYaw: player.heading, speed: 4.6,
   });
+  renderer.update({ x: player.x, z: player.z }, gameTime);
+  roads.updateSignals(gameTime);
+  world.update(gameTime);
+  renderer.render();
 
-  announce('Block Dodger. Press Space or click to start.');
+  hud.clearRect(0, 0, width, height);
+  hud.fillStyle = 'rgba(14, 26, 32, 0.78)';
+  hud.fillRect(24, 24, 330, 86);
+  hud.fillStyle = CLOCK.horizon;
+  hud.font = '700 13px "Trebuchet MS", Arial, sans-serif';
+  hud.fillText('SKELETON ONLINE · CITY WALKABLE', 42, 52);
+  hud.fillStyle = '#f7efdc';
+  hud.font = '700 18px "Trebuchet MS", Arial, sans-serif';
+  hud.fillText(`${CLOCK.label} · ${Math.round(player.x)}, ${Math.round(player.z)}`, 42, 82);
+  hud.font = '600 11px "Trebuchet MS", Arial, sans-serif';
+  hud.fillStyle = '#d9d0bb';
+  hud.fillText('WASD TO WALK · MOUSE TO LOOK', 42, 100);
+
+  input.endFrame();
+  frames += 1;
+  if (frames > 20) window.__PALMSHORE_READY__ = true;
   requestAnimationFrame(frame);
 }
-
-if (shot) runShot(shot);
-else runGame();
+let frames = 0;
+requestAnimationFrame(frame);
